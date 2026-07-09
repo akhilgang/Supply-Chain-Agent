@@ -215,6 +215,29 @@ ANTI-HALLUCINATION RULES (critical):
 
             logger.info("✅ JSON parsed successfully")
 
+            # Ensure all TripPlan required fields are populated before validation.
+            # (destination, travel_dates, card_recommendation, currency_info are required.)
+            response_data.setdefault("destination", "N/A")
+            response_data.setdefault("travel_dates", "N/A")
+
+            # card_recommendation is required; supply a placeholder if missing and
+            # coerce any null sub-fields to "N/A" (they are required strings).
+            card = response_data.get("card_recommendation") or {}
+            if not isinstance(card, dict):
+                card = {}
+            card = {
+                "card": card.get("card") or "N/A",
+                "benefit": card.get("benefit") or "N/A",
+                "fx_fee": card.get("fx_fee") or "N/A",
+                "source": card.get("source") or "N/A",
+            }
+            response_data["card_recommendation"] = card
+
+            # currency_info is required; its individual fields are optional,
+            # so an empty object is valid when no data was gathered.
+            if not response_data.get("currency_info"):
+                response_data["currency_info"] = {}
+
             # Validate with TripPlan Pydantic model
             trip_plan = TripPlan(**response_data)
             logger.info(f"✅ Pydantic validation passed: {trip_plan.destination}")

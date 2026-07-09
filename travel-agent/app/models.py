@@ -20,9 +20,9 @@ class SearchResult(BaseModel):
 
 class CardRecommendation(BaseModel):
     card: str
-    benefit: Optional[str] = None
-    fx_fee: Optional[str] = None
-    source: Optional[str] = None
+    benefit: str
+    fx_fee: str
+    source: str
 
 
 class CurrencyInfo(BaseModel):
@@ -33,11 +33,13 @@ class CurrencyInfo(BaseModel):
 
 
 class TripPlan(BaseModel):
-    destination: str = "N/A"
-    travel_dates: str = "N/A"
+    # Required fields: destination, travel dates, card recommendation, currency info
+    destination: str
+    travel_dates: str
+    card_recommendation: CardRecommendation
+    currency_info: CurrencyInfo
+    # Optional enrichment fields
     weather: Optional[Weather] = None
     results: Optional[List[SearchResult]] = None
-    card_recommendation: Optional[CardRecommendation] = None
-    currency_info: Optional[CurrencyInfo] = None
     citations: Optional[List[str]] = None
     next_steps: List[str] = []
