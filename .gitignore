@@ -1,19 +1,8 @@
-# Virtual environments
-venv/
-.venv/
-env/
-**/venv/
-**/.venv/
-
-# Secrets
-.env
-*.env
-!env.example
-
-# Python
 __pycache__/
-*.py[cod]
-.pytest_cache/
-
-# OS
-.DS_Store
+*.pyc
+*.pyo
+.env
+banking_documents/
+chroma_db_banking/
+logs/
+*.log
