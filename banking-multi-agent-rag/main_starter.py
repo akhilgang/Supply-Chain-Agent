@@ -12,7 +12,7 @@ from semantic_kernel.agents.runtime import InProcessRuntime
 from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
 from semantic_kernel.kernel_pydantic import KernelBaseModel
 from semantic_kernel.contents import ChatMessageContent
-from rag_utils import extract_banking_policies, create_semantic_kernel_context
+from rag_utils import extract_banking_policies, create_semantic_kernel_context, extract_text_from_bytes
 from blob_connector import BlobStorageConnector
 from chroma_manager import ChromaDBManager
 from shared_state import SharedState
@@ -270,9 +270,28 @@ class EnhancedBankingSequentialOrchestration:
         """Push all Blob documents into ChromaDB for semantic search."""
         try:
             for doc_name in self.blob_connector.list_documents():
-                content = self.blob_connector.get_document_content(doc_name)
-                if content:
-                    await self.chroma_store.chunk_and_store_document(doc_name, content)
+                raw = self.blob_connector.get_document_content(doc_name)
+                if not raw:
+                    continue
+                # Convert raw content to plain text (handles PDF, DOCX, markdown)
+                if isinstance(raw, bytes):
+                    content = extract_text_from_bytes(raw, doc_name)
+                else:
+                    # BlobStorageConnector returns str for text files;
+                    # for PDF/DOCX bytes stored as str, re-encode and parse
+                    content = extract_text_from_bytes(raw.encode("utf-8", errors="replace"), doc_name) \
+                              if doc_name.lower().endswith((".pdf", ".docx", ".doc")) \
+                              else raw
+                if not content:
+                    self.logger.warning(f"Could not extract text from '{doc_name}', skipping.")
+                    continue
+                collection_type = self.chroma_store.determine_collection(doc_name, content)
+                chunks_stored = await self.chroma_store.chunk_and_store_document(
+                    doc_name, content, collection_type
+                )
+                self.logger.info(
+                    f"Indexed '{doc_name}' → collection '{collection_type}' ({chunks_stored} chunks)"
+                )
             self.logger.info("Banking documents indexed in ChromaDB.")
         except Exception as e:
             self.logger.warning(f"ChromaDB indexing partially failed: {e}")

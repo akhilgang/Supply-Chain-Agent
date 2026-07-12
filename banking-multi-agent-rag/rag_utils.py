@@ -1,5 +1,132 @@
-from typing import Any, List, Dict
+from typing import Any, List, Dict, Optional
 import re
+import os
+import io
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Multi-format text extraction
+# ---------------------------------------------------------------------------
+
+def extract_text_from_file(file_path: str) -> Optional[str]:
+    """Extract plain text from PDF, DOCX, or text/markdown files.
+
+    Returns the extracted string, or None if the file cannot be read.
+    Requires optional dependencies: pypdf (PDF), python-docx (DOCX).
+    """
+    ext = os.path.splitext(file_path)[1].lower()
+
+    if ext == ".pdf":
+        return _extract_pdf(file_path)
+    elif ext in (".docx", ".doc"):
+        return _extract_docx(file_path)
+    elif ext in (".txt", ".md", ".markdown", ""):
+        try:
+            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                return f.read()
+        except OSError as e:
+            logger.warning(f"Cannot read text file {file_path}: {e}")
+            return None
+    else:
+        # Try plain-text fallback for unknown extensions
+        try:
+            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                return f.read()
+        except OSError:
+            return None
+
+
+def extract_text_from_bytes(data: bytes, filename: str) -> Optional[str]:
+    """Extract plain text from raw bytes given the original filename for type detection.
+
+    This is the entry-point used when content is already in memory (e.g. from
+    BlobStorageConnector.get_document_content which returns a string, or from
+    a real Azure Blob download that returns bytes).
+    """
+    ext = os.path.splitext(filename)[1].lower()
+
+    if ext == ".pdf":
+        return _extract_pdf_bytes(data)
+    elif ext in (".docx", ".doc"):
+        return _extract_docx_bytes(data)
+    else:
+        # Assume UTF-8 text / markdown
+        if isinstance(data, bytes):
+            return data.decode("utf-8", errors="replace")
+        return str(data)
+
+
+# -- PDF helpers ----------------------------------------------------------------
+
+def _extract_pdf(path: str) -> Optional[str]:
+    try:
+        with open(path, "rb") as f:
+            return _extract_pdf_bytes(f.read())
+    except OSError as e:
+        logger.warning(f"Cannot open PDF {path}: {e}")
+        return None
+
+
+def _extract_pdf_bytes(data: bytes) -> Optional[str]:
+    """Extract text from PDF bytes. Tries pypdf first, then pdfplumber."""
+    # Try pypdf (pip install pypdf)
+    try:
+        import pypdf  # noqa: F401 — check availability
+        reader = pypdf.PdfReader(io.BytesIO(data))
+        pages = [page.extract_text() or "" for page in reader.pages]
+        text = "\n\n".join(p for p in pages if p.strip())
+        if text.strip():
+            return text
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.warning(f"pypdf extraction failed: {e}")
+
+    # Fallback: pdfplumber (pip install pdfplumber)
+    try:
+        import pdfplumber
+        with pdfplumber.open(io.BytesIO(data)) as pdf:
+            pages = [p.extract_text() or "" for p in pdf.pages]
+        text = "\n\n".join(p for p in pages if p.strip())
+        if text.strip():
+            return text
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.warning(f"pdfplumber extraction failed: {e}")
+
+    logger.warning("PDF text extraction unavailable — install pypdf or pdfplumber.")
+    return None
+
+
+# -- DOCX helpers ---------------------------------------------------------------
+
+def _extract_docx(path: str) -> Optional[str]:
+    try:
+        with open(path, "rb") as f:
+            return _extract_docx_bytes(f.read())
+    except OSError as e:
+        logger.warning(f"Cannot open DOCX {path}: {e}")
+        return None
+
+
+def _extract_docx_bytes(data: bytes) -> Optional[str]:
+    """Extract text from DOCX bytes using python-docx."""
+    try:
+        from docx import Document  # pip install python-docx
+        doc = Document(io.BytesIO(data))
+        paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+        return "\n\n".join(paragraphs)
+    except ImportError:
+        logger.warning("DOCX extraction unavailable — install python-docx.")
+        return None
+    except Exception as e:
+        logger.warning(f"python-docx extraction failed: {e}")
+        return None
+
 
 def extract_banking_policies(docs: List[Dict]) -> Dict[str, Any]:
     """

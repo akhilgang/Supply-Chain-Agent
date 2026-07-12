@@ -1,0 +1,20 @@
+Azure SQL - Connection: OK
+
+Customer 12345:  income=$75,000.00  transactions=4
+   2024-03-20 08:30:00.0000000  $  4,500.00  Salary Deposit
+   2024-03-15 14:20:00.0000000  $  1,500.00  Mortgage Payment
+   2024-03-10 09:15:00.0000000  $    300.00  Investment Contribution
+   2024-03-05 16:45:00.0000000  $    200.00  Utility Bills
+
+Customer 67890:  income=$45,000.00  transactions=4
+   2024-03-20 09:00:00.0000000  $  3,200.00  Salary Deposit
+   2024-03-14 10:30:00.0000000  $  1,200.00  Rent Payment
+   2024-03-08 11:15:00.0000000  $    400.00  Car Payment
+   2024-03-02 13:20:00.0000000  $    150.00  Student Loan
+
+Customer 11111:  income=$28,000.00  transactions=4
+   2024-03-20 07:45:00.0000000  $  2,300.00  Salary Deposit
+   2024-03-12 12:10:00.0000000  $    800.00  Rent Payment
+   2024-03-07 15:30:00.0000000  $    300.00  Credit Card Payment
+   2024-03-01 17:55:00.0000000  $    150.00  Overdraft Fee
+

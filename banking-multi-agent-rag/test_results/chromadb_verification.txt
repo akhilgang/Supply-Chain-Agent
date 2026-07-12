@@ -1,0 +1,61 @@
+✅ ChromaDB client initialized successfully
+  ✅ Collection 'fraud_detection' initialized
+  ✅ Collection 'loan_policies' initialized
+  ✅ Collection 'customer_support' initialized
+  ✅ Collection 'risk_assessment' initialized
+  ✅ Collection 'transaction_monitoring' initialized
+  ✅ Collection 'compliance' initialized
+ChromaDB Collection Stats (post-ingestion):
+-------------------------------------------------------
+  fraud_detection                   15 docs  [active]
+  loan_policies                     15 docs  [active]
+  customer_support                   0 docs  [empty]
+  risk_assessment                    0 docs  [empty]
+  transaction_monitoring             0 docs  [empty]
+  compliance                         0 docs  [empty]
+-------------------------------------------------------
+  TOTAL                               30 documents
+
+hybrid_search → 6 results returned:
+  score=0.888  collection=loan_policies  src=loan_eligibility_framework.md
+  excerpt: # Loan Eligibility Framework
+## Comprehensive Credit Assessment
+
+### Income Requirements:
+| Tier | M
+
+  score=0.888  collection=loan_policies  src=loan_eligibility_framework.md
+  excerpt: # Loan Eligibility Framework
+## Comprehensive Credit Assessment
+
+### Income Requirements:
+| Tier | M
+
+  score=0.888  collection=loan_policies  src=loan_eligibility_framework.md
+  excerpt: # Loan Eligibility Framework
+## Comprehensive Credit Assessment
+
+### Income Requirements:
+| Tier | M
+
+  score=-0.361  collection=fraud_detection  src=customer_support_protocols.md
+  excerpt: # Customer Support Protocols
+## Service Excellence Framework
+
+### Priority Classification:
+- **P0 - 
+
+  score=-0.361  collection=fraud_detection  src=customer_support_protocols.md
+  excerpt: # Customer Support Protocols
+## Service Excellence Framework
+
+### Priority Classification:
+- **P0 - 
+
+  score=-0.361  collection=fraud_detection  src=customer_support_protocols.md
+  excerpt: # Customer Support Protocols
+## Service Excellence Framework
+
+### Priority Classification:
+- **P0 - 
+
