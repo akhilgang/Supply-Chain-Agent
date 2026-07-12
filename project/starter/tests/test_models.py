@@ -57,11 +57,26 @@ class TestCardRecommendation:
             fx_fee="None",
             source="knowledge_base"
         )
-        
+
         assert card.card == "BankGold"
         assert card.benefit == "4x dining worldwide"
         assert card.fx_fee == "None"
         assert card.source == "knowledge_base"
+
+    def test_card_recommendation_requires_benefit(self):
+        """Omitting the required benefit field must raise ValidationError"""
+        with pytest.raises(ValidationError):
+            CardRecommendation(card="BankGold", fx_fee="None", source="knowledge_base")
+
+    def test_card_recommendation_requires_fx_fee(self):
+        """Omitting the required fx_fee field must raise ValidationError"""
+        with pytest.raises(ValidationError):
+            CardRecommendation(card="BankGold", benefit="4x dining", source="knowledge_base")
+
+    def test_card_recommendation_requires_source(self):
+        """Omitting the required source field must raise ValidationError"""
+        with pytest.raises(ValidationError):
+            CardRecommendation(card="BankGold", benefit="4x dining", fx_fee="None")
 
 
 class TestCurrencyInfo:
@@ -169,12 +184,50 @@ class TestTripPlan:
         assert plan.citations is not None
         assert len(plan.citations) == 1
     
-    def test_trip_plan_with_defaults(self):
-        """Test that TripPlan uses default values when fields are omitted"""
-        plan = TripPlan(destination="Paris")
-        # Model now has defaults for all optional fields
-        assert plan.destination == "Paris"
-        assert plan.travel_dates == "N/A"  # default
+    def _minimal_required_kwargs(self):
+        """Helper: the four required TripPlan fields with valid values"""
+        return dict(
+            destination="Paris",
+            travel_dates="2026-06-01 to 2026-06-08",
+            card_recommendation=CardRecommendation(
+                card="BankGold", benefit="4x dining worldwide",
+                fx_fee="None", source="knowledge_base"
+            ),
+            currency_info=CurrencyInfo(sample_meal_usd=100.0, points_earned=400),
+        )
+
+    def test_trip_plan_optional_defaults(self):
+        """Optional fields default correctly when only required fields are given"""
+        plan = TripPlan(**self._minimal_required_kwargs())
         assert plan.weather is None
         assert plan.results is None
+        assert plan.citations is None
         assert plan.next_steps == []  # default empty list
+
+    def test_trip_plan_requires_destination(self):
+        """Omitting destination must raise ValidationError"""
+        kwargs = self._minimal_required_kwargs()
+        del kwargs["destination"]
+        with pytest.raises(ValidationError):
+            TripPlan(**kwargs)
+
+    def test_trip_plan_requires_travel_dates(self):
+        """Omitting travel_dates must raise ValidationError"""
+        kwargs = self._minimal_required_kwargs()
+        del kwargs["travel_dates"]
+        with pytest.raises(ValidationError):
+            TripPlan(**kwargs)
+
+    def test_trip_plan_requires_card_recommendation(self):
+        """Omitting card_recommendation must raise ValidationError"""
+        kwargs = self._minimal_required_kwargs()
+        del kwargs["card_recommendation"]
+        with pytest.raises(ValidationError):
+            TripPlan(**kwargs)
+
+    def test_trip_plan_requires_currency_info(self):
+        """Omitting currency_info must raise ValidationError"""
+        kwargs = self._minimal_required_kwargs()
+        del kwargs["currency_info"]
+        with pytest.raises(ValidationError):
+            TripPlan(**kwargs)

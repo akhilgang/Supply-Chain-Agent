@@ -59,9 +59,19 @@ class ShortTermMemory:
         - Append to memory_items and update total_tokens
         - Call _evict_if_needed() to enforce limits
         """
-        # TODO: Implement memory addition
-        # This is a placeholder - replace with actual implementation
-        pass
+        tokens = self._estimate_tokens(content)
+        item = {
+            'role': role,
+            'content': content,
+            'timestamp': datetime.now().isoformat(),
+            'tokens': tokens,
+            'metadata': metadata or {}
+        }
+        self.memory_items.append(item)
+        self.total_tokens += tokens
+
+        # Enforce sliding-window limits
+        self._evict_if_needed()
 
     def add_tool_call(self, tool_name: str, input_data: Dict[str, Any],
                      output_data: Dict[str, Any], success: bool = True) -> None:
@@ -110,9 +120,20 @@ class ShortTermMemory:
         - Remove oldest items if we exceed max_tokens
         - Update total_tokens when removing items
         """
-        # TODO: Implement eviction
-        # This is a placeholder - replace with actual implementation
-        pass
+        # Evict oldest items while we exceed the item limit
+        while len(self.memory_items) > self.max_items:
+            removed = self.memory_items.pop(0)
+            self.total_tokens -= removed.get('tokens', 0)
+
+        # Evict oldest items while we exceed the token limit
+        # (keep at least one item even if it alone exceeds the limit)
+        while self.total_tokens > self.max_tokens and len(self.memory_items) > 1:
+            removed = self.memory_items.pop(0)
+            self.total_tokens -= removed.get('tokens', 0)
+
+        # Guard against negative drift from rounding
+        if self.total_tokens < 0:
+            self.total_tokens = 0
 
     def get_conversation_history(self, include_metadata: bool = False) -> List[Dict[str, Any]]:
         """
@@ -129,9 +150,19 @@ class ShortTermMemory:
         - If include_metadata, return full items
         - Otherwise return only role, content, timestamp
         """
-        # TODO: Implement memory retrieval
-        # This is a placeholder - replace with actual implementation
-        return []
+        if include_metadata:
+            # Return full copies of items in chronological order
+            return [dict(item) for item in self.memory_items]
+
+        # Return a trimmed view without metadata
+        return [
+            {
+                'role': item['role'],
+                'content': item['content'],
+                'timestamp': item['timestamp']
+            }
+            for item in self.memory_items
+        ]
 
     def get_recent_conversation(self, last_n: int = 5) -> List[Dict[str, Any]]:
         """

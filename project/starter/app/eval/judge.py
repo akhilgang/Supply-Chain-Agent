@@ -36,9 +36,13 @@ async def evaluate(case, judge):
 
         # LLM-as-Judge evaluation
         print(f"⚖️ Running LLM-as-Judge evaluation...")
-        # TODO: Call judge.evaluate_response() with query, response, structured_output, tool_calls, citations
-        # This is a placeholder - replace with actual implementation
-        result = None
+        result = await judge.evaluate_response(
+            user_query=case["query"],
+            agent_response=response,
+            structured_output=structured_output,
+            tool_calls=response_data.get("metadata", {}).get("tools_called", []),
+            citations=citations,
+        )
 
         return {
             "name": case["name"],

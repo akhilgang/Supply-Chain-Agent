@@ -43,9 +43,7 @@ class CardTools:
             best_score = 0
 
             for card in cards_to_check:
-                # TODO: Call get_card_recommendation(card, category, amount, country)
-                # This is a placeholder - replace with actual implementation
-                recommendation = None
+                recommendation = get_card_recommendation(card, category, amount, country)
 
                 # Calculate score: base points + bonus for no FX fee
                 points = recommendation.get("points_earned", 0) if recommendation else 0

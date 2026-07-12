@@ -88,23 +88,25 @@ class AgentState:
         - Move to next phase if not at end
         - Update timestamp and return result
         """
-        # TODO: Implement phase advancement
-        # This is a placeholder - replace with actual implementation
-        pass
+        phases = list(Phase)
+        current_index = phases.index(self.phase)
+
+        if current_index < len(phases) - 1:
+            self.phase = phases[current_index + 1]
+            self.updated_at = datetime.now()
+            return True
+
+        # Already at the final phase (Done)
+        return False
 
     def reset(self) -> None:
         """
         Reset the agent state to initial state.
 
-        TODO: Implement state reset
-        - Reset phase to Init
-        - Generate new session_id
-        - Reset timestamps
-        - Clear all tracking data
+        Reinitializes all tracking data, generates a new session id,
+        and resets the phase back to Init.
         """
-        # TODO: Implement state reset
-        # This is a placeholder - replace with actual implementation
-        pass
+        self.__init__()
 
     def is_complete(self) -> bool:
         """Check if the agent process is complete"""

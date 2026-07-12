@@ -94,14 +94,14 @@ class LLMJudge:
             from semantic_kernel.connectors.ai.open_ai import OpenAIChatPromptExecutionSettings
 
             settings = OpenAIChatPromptExecutionSettings(
-                temperature=0.1,
-                max_tokens=1000
+                max_completion_tokens=2000
             )
 
-            # TODO: Call LLM to get evaluation response
-            # Use chat_service.get_chat_message_contents() with chat_history and settings
-            # This is a placeholder - replace with actual implementation
-            response = None
+            response = await chat_service.get_chat_message_contents(
+                chat_history=chat_history,
+                settings=settings,
+                kernel=self.kernel,
+            )
 
             # Parse evaluation result
             evaluation_text = response[0].content.strip() if response else ""

@@ -1,4 +1,5 @@
 import os
+import asyncio
 from dotenv import load_dotenv
 from azure.cosmos import CosmosClient, PartitionKey
 from azure.identity import DefaultAzureCredential
@@ -40,9 +41,19 @@ def embed_texts(texts):
     - Loop through texts and call generate_embeddings() for each
     - Convert results to list format for JSON serialization
     """
-    # TODO: Generate embeddings for each text
-    # This is a placeholder - replace with actual implementation
-    return []
+    kernel = create_embedding_kernel()
+    embedding_service = kernel.get_service(type=AzureTextEmbedding)
+
+    embeddings = []
+    for text in texts:
+        # generate_embeddings is async; run it to completion in this sync context
+        result = asyncio.run(embedding_service.generate_embeddings([text]))
+        vector = result[0]
+        if hasattr(vector, "tolist"):
+            embeddings.append(vector.tolist())
+        else:
+            embeddings.append(list(vector))
+    return embeddings
 
 def upsert_snippet(doc_id, text, pk="cards"):
     """
@@ -54,9 +65,14 @@ def upsert_snippet(doc_id, text, pk="cards"):
     - Use container.upsert_item() to store in Cosmos DB
     """
     try:
-        # TODO: Generate embedding and upsert document
-        # This is a placeholder - replace with actual implementation
-        pass
+        embedding = embed_texts([text])[0]
+        document = {
+            "id": doc_id,
+            "pk": pk,
+            "text": text,
+            "embedding": embedding
+        }
+        container.upsert_item(document)
         print(f"✅ {doc_id} upserted with Semantic Kernel embeddings.")
     except Exception as e:
         print(f"❌ Failed to upsert {doc_id}: {e}")

@@ -4,7 +4,7 @@ import os
 import json
 from typing import List, Dict, Any, Optional
 from semantic_kernel.functions import kernel_function
-from azure.ai.projects import AIProjectClient
+from azure.ai.agents import AgentsClient
 from azure.identity import DefaultAzureCredential
 
 
@@ -13,7 +13,7 @@ class SearchTools:
         self.project_endpoint = os.getenv("PROJECT_ENDPOINT")
         self.agent_id = os.getenv("AGENT_ID")
         self.connection_id = os.getenv("BING_CONNECTION_ID")
-        self.cred = DefaultAzureCredential()
+        self.cred = DefaultAzureCredential(additionally_allowed_tenants=["*"])
 
     @kernel_function(
         name="web_search",
@@ -37,29 +37,45 @@ class SearchTools:
             }]
 
         try:
-            client = AIProjectClient(endpoint=self.project_endpoint, credential=self.cred)
-            thread = client.agents.threads.create()
+            client = AgentsClient(endpoint=self.project_endpoint, credential=self.cred)
+            thread = client.threads.create()
 
-            # TODO: Create message with Bing search query
-            # Use messages.create() with thread_id, role as "user", and content with the query
-            # Content should instruct agent to return ONLY a JSON array with title, url, snippet fields
-            # Include an example format in the prompt so agent knows the expected structure
-            pass
+            # Create a message instructing the agent to return ONLY a JSON array
+            client.messages.create(
+                thread_id=thread.id,
+                role="user",
+                content=(
+                    f"Use Bing web search to find results for: {query}\n\n"
+                    f"Return ONLY a JSON array (no prose, no markdown) of up to {max_results} "
+                    f"results. Each element must have exactly these fields: "
+                    f'"title", "url", and "snippet".\n\n'
+                    f'Example format:\n'
+                    f'[{{"title": "Example", "url": "https://example.com", '
+                    f'"snippet": "A short description."}}]'
+                )
+            )
 
-            # TODO: Run the agent to process the message
-            # Use runs.create_and_process() with thread_id and agent_id
-            pass
+            # Run the agent to process the message using Bing grounding
+            client.runs.create_and_process(
+                thread_id=thread.id,
+                agent_id=self.agent_id
+            )
 
-            messages = list(client.agents.messages.list(thread_id=thread.id))
+            messages = list(client.messages.list(thread_id=thread.id))
             assistant_msgs = [m for m in messages if m.role == "assistant"]
             content_blocks = assistant_msgs[-1].content if assistant_msgs else []
 
             raw_json = None
-            # TODO: Extract raw_json from content_blocks
-            # Check if first content block is type "text", then get the value from text field
-            pass
+            # Extract the text value from the first text content block
+            if content_blocks:
+                first_block = content_blocks[0]
+                block_type = getattr(first_block, "type", None)
+                if block_type == "text":
+                    text_obj = getattr(first_block, "text", None)
+                    if text_obj is not None:
+                        raw_json = getattr(text_obj, "value", None)
 
-            client.agents.threads.delete(thread_id=thread.id)
+            client.threads.delete(thread_id=thread.id)
 
             if not raw_json:
                 return [{
@@ -88,9 +104,9 @@ class SearchTools:
                 else:
                     raise ValueError(f"No JSON array found in response. Got: {raw_json[:200]}")
 
-            # TODO: Parse raw_json into Python list
-            # Use json.loads() to parse the cleaned JSON string
-            results = []
+            results = json.loads(raw_json)
+            if not isinstance(results, list):
+                results = [results]
 
             # Normalize
             normalized = [{

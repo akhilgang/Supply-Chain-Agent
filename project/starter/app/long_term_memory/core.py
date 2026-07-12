@@ -69,11 +69,20 @@ class LongTermMemory:
         """Add a new memory to Cosmos DB."""
         memory_id = str(uuid.uuid4())
         now = datetime.utcnow()
-        # TODO: Create MemoryItem with all fields and insert into Cosmos DB
-        # Create MemoryItem with: id, session_id, content, memory_type, importance_score, access_count=0, last_accessed, created_at, tags, metadata, embedding
-        # Use self._container.create_item() to insert the item
-        item = None
-        pass
+        item = MemoryItem(
+            id=memory_id,
+            session_id=session_id,
+            content=content,
+            memory_type=memory_type,
+            importance_score=importance_score,
+            access_count=0,
+            last_accessed=now,
+            created_at=now,
+            tags=tags or [],
+            metadata=metadata or {},
+            embedding=embedding,
+        )
+        self._container.create_item(item.to_dict())
         logger.info(f"✅ Added memory {memory_id} (importance={importance_score})")
 
         self._check_and_prune_if_needed()
@@ -82,11 +91,14 @@ class LongTermMemory:
     def get_memory(self, memory_id: str, session_id: str) -> Optional[MemoryItem]:
         """Retrieve memory by id and increment access stats."""
         try:
-            # TODO: Read memory from Cosmos DB and update access stats
-            # Use self._container.read_item() to get the item
-            # Convert to MemoryItem, increment access_count, update last_accessed
-            # Use self._container.upsert_item() to save changes
-            mem = None
+            data = self._container.read_item(item=memory_id, partition_key=session_id)
+            mem = MemoryItem.from_dict(data)
+
+            # Update access statistics
+            mem.access_count += 1
+            mem.last_accessed = datetime.utcnow()
+            self._container.upsert_item(mem.to_dict())
+
             return mem
         except Exception as e:
             logger.error(f"❌ Failed to get memory {memory_id}: {e}")

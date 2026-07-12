@@ -38,11 +38,44 @@ def create_kernel():
 
     Hint: Use environment variables for credentials (AZURE_OPENAI_ENDPOINT, etc.)
     """
-    # TODO: Implement kernel creation
+    # Azure OpenAI configuration from environment
+    endpoint = os.environ["AZURE_OPENAI_ENDPOINT"]
+    api_version = os.environ["AZURE_OPENAI_API_VERSION"]
+    api_key = os.environ["AZURE_OPENAI_KEY"]
+    chat_deployment = os.environ["AZURE_OPENAI_CHAT_DEPLOYMENT"]
+    embed_deployment = os.environ["AZURE_OPENAI_EMBED_DEPLOYMENT"]
+
     kernel = Kernel()
 
-    # TODO: Add Azure OpenAI services and tool plugins
+    # Add Azure OpenAI services. service_id is set to the deployment name so
+    # components (e.g. the LLM judge) can look the service up by deployment name.
+    kernel.add_service(
+        AzureChatCompletion(
+            service_id=chat_deployment,
+            deployment_name=chat_deployment,
+            endpoint=endpoint,
+            api_key=api_key,
+            api_version=api_version,
+        )
+    )
+    kernel.add_service(
+        AzureTextEmbedding(
+            service_id=embed_deployment,
+            deployment_name=embed_deployment,
+            endpoint=endpoint,
+            api_key=api_key,
+            api_version=api_version,
+        )
+    )
 
+    # Register tool plugins so the LLM can call them automatically
+    kernel.add_plugin(WeatherTools(), "weather")
+    kernel.add_plugin(FxTools(), "fx")
+    kernel.add_plugin(SearchTools(), "search")
+    kernel.add_plugin(CardTools(), "card")
+    kernel.add_plugin(KnowledgeTools(), "knowledge")
+
+    logger.info("✅ Kernel created with Azure services and 5 tool plugins")
     return kernel
 
 
@@ -95,12 +128,38 @@ async def run_request(user_input: str, memory: ShortTermMemory = None) -> str:
         #    - NEVER make up or guess data
         #
         # Hint: The output JSON should match the TripPlan model in app/models.py
-        system_message = """You are a professional travel concierge agent.
+        system_message = """You are a professional AI travel concierge agent with access to real-time tools.
 
-TODO: Complete this system message prompt with:
-- Available tools and their usage
-- JSON output format matching TripPlan model
-- Anti-hallucination instructions (use null/N/A for missing data)
+Your job is to help users plan trips by gathering real data from your tools and returning a single structured JSON object.
+
+AVAILABLE TOOLS (call them as needed — you may call several in sequence):
+- weather.get_weather(city="...") — get the weather forecast for a destination city.
+- search.web_search(query="...") — search the web for restaurants, hotels, and attractions. Use for anything requiring current, real-world results.
+- fx.convert_fx(amount=..., base="USD", target="...") — convert currency (e.g. a sample $100 meal into the local currency).
+- card.recommend_card(category="dining", country="...") — recommend the best credit card for a spending category and country.
+- knowledge.search_knowledge(query="...") — retrieve credit-card benefits, perks, and lounge/travel policies from the internal knowledge base.
+
+TOOL USAGE GUIDELINES:
+- For a trip-planning request, call get_weather for the destination, web_search for places to visit/eat, recommend_card and/or search_knowledge for the user's card, and convert_fx for local currency context.
+- Only call tools that are relevant to the user's request.
+
+OUTPUT FORMAT — respond with ONLY a valid JSON object (no markdown, no prose) matching this schema:
+{
+  "destination": "<city or 'N/A'>",
+  "travel_dates": "<dates or 'N/A'>",
+  "weather": {"temperature_c": <float|null>, "conditions": "<string|null>", "recommendation": "<string|null>"} | null,
+  "results": [{"title": "...", "snippet": "...", "url": "...", "price_range": "...", "rating": <float|null>, "category": "restaurant|hotel|event|general"}] | null,
+  "card_recommendation": {"card": "...", "benefit": "...", "fx_fee": "...", "source": "..."} | null,
+  "currency_info": {"usd_to_eur": <float|null>, "sample_meal_usd": <float|null>, "sample_meal_eur": <float|null>, "points_earned": <int|null>} | null,
+  "citations": ["<url>", ...] | null,
+  "next_steps": ["...", "..."]
+}
+
+ANTI-HALLUCINATION RULES (critical):
+- Only include data you actually obtained from tools. NEVER invent weather, prices, ratings, URLs, or card details.
+- If an optional field has no tool-derived data, set it to null (or omit list entries).
+- If the request is not a trip-planning query, set "destination" and "travel_dates" to "N/A".
+- Populate "citations" with the URLs returned by web_search.
 """
 
         chat_history.add_system_message(system_message)
@@ -115,10 +174,11 @@ TODO: Complete this system message prompt with:
         chat_history.add_user_message(user_input)
 
         # Enable automatic function calling
+        # gpt-5.x models only accept default temperature and require
+        # max_completion_tokens instead of max_tokens.
         execution_settings = OpenAIChatPromptExecutionSettings(
             function_choice_behavior=FunctionChoiceBehavior.Auto(),
-            temperature=0.7,
-            max_tokens=2000
+            max_completion_tokens=4000
         )
 
         state.advance()
@@ -154,6 +214,29 @@ TODO: Complete this system message prompt with:
             response_data = json_module.loads(json_str)
 
             logger.info("✅ JSON parsed successfully")
+
+            # Ensure all TripPlan required fields are populated before validation.
+            # (destination, travel_dates, card_recommendation, currency_info are required.)
+            response_data.setdefault("destination", "N/A")
+            response_data.setdefault("travel_dates", "N/A")
+
+            # card_recommendation is required; supply a placeholder if missing and
+            # coerce any null sub-fields to "N/A" (they are required strings).
+            card = response_data.get("card_recommendation") or {}
+            if not isinstance(card, dict):
+                card = {}
+            card = {
+                "card": card.get("card") or "N/A",
+                "benefit": card.get("benefit") or "N/A",
+                "fx_fee": card.get("fx_fee") or "N/A",
+                "source": card.get("source") or "N/A",
+            }
+            response_data["card_recommendation"] = card
+
+            # currency_info is required; its individual fields are optional,
+            # so an empty object is valid when no data was gathered.
+            if not response_data.get("currency_info"):
+                response_data["currency_info"] = {}
 
             # Validate with TripPlan Pydantic model
             trip_plan = TripPlan(**response_data)

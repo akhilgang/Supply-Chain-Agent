@@ -52,12 +52,14 @@ async def embed_texts(texts):
         embedding_service = kernel.get_service(type=AzureTextEmbedding)
         embeddings = []
         for text in texts:
-            result = await embedding_service.generate_embeddings(text)
-            # Convert ndarray to list for JSON serialization
-            if hasattr(result, 'tolist'):
-                embeddings.append(result.tolist())
+            # generate_embeddings expects a list and returns a 2D array (n, dim);
+            # take the first (and only) row so each embedding is a flat vector.
+            result = await embedding_service.generate_embeddings([text])
+            vector = result[0]
+            if hasattr(vector, 'tolist'):
+                embeddings.append(vector.tolist())
             else:
-                embeddings.append(list(result))
+                embeddings.append(list(vector))
         return embeddings
     except Exception as e:
         print(f"Embedding generation failed: {e}")
@@ -70,10 +72,11 @@ async def retrieve(query: str, k: int = 5, partition_key: str = None):
         if client is None or container is None:
             raise Exception("Cosmos DB not available")
 
-        # TODO: Generate embedding for the query
-        # Use embed_texts() to convert query to vector, then extract first element
-        query_embedding = None
-        query_vector = []
+        # Generate embedding for the query
+        print(f"\n🔎 RAG retrieval for query: {query!r}")
+        query_embedding = await embed_texts([query])
+        query_vector = query_embedding[0] if query_embedding else []
+        print(f"   ✅ Query embedding generated ({len(query_vector)} dimensions)")
 
         if not query_vector or not isinstance(query_vector, list):
             raise ValueError(f"Invalid embedding format: {type(query_vector)}")
@@ -109,9 +112,31 @@ async def retrieve(query: str, k: int = 5, partition_key: str = None):
                 {"name": "@queryVector", "value": query_vector}
             ]
 
-        # TODO: Execute vector search query against Cosmos DB
-        # Use container.query_items() with sql, parameters, and enable_cross_partition_query=True
+        # Execute the vector similarity search against Cosmos DB
+        raw_results = list(container.query_items(
+            query=sql,
+            parameters=params,
+            enable_cross_partition_query=True
+        ))
+
+        # Normalize results: convert VectorDistance to a similarity score
         results = []
+        print(f"   ✅ VectorDistance query executed against Cosmos DB — {len(raw_results)} result(s):")
+        for item in raw_results:
+            distance = item.get("distance", 1.0)
+            score = 1.0 - float(distance)  # cosine distance -> similarity
+            content = item.get("text", "")
+            print(f"   • id={item.get('id')} | VectorDistance={distance:.4f} | similarity={score:.4f}")
+            print(f"       content: {content[:90]}")
+            results.append({
+                "id": item.get("id"),
+                "content": content,
+                "pk": item.get("pk"),
+                "distance": distance,
+                "score": score,
+                "metadata": {"id": item.get("id"), "pk": item.get("pk")}
+            })
+
         return results
     except Exception as e:
         print(f"❌ RAG retrieval failed: {e}")

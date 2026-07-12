@@ -45,10 +45,7 @@ class KnowledgeTools:
             # First try RAG retrieval for semantic search
             rag_results = []
             try:
-                # TODO: Call retrieve() for RAG-based semantic search
-                # Use query, k=max_results, and partition_key="cards"
-                # This is a placeholder - replace with actual implementation
-                rag_results = []
+                rag_results = await retrieve(query, k=max_results, partition_key="cards")
                 logger.info(f"RAG retrieved {len(rag_results)} results")
             except Exception as e:
                 logger.warning(f"RAG retrieval failed: {e}")

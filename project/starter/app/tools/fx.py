@@ -21,6 +21,13 @@ class FxTools:
         - Query params: amount, from (base currency), to (target currency)
         - Use requests.get() with timeout and return .json() response
         """
-        # TODO: Make API request to Frankfurter and return JSON response
-        # This is a placeholder - replace with actual implementation
-        pass
+        try:
+            resp = requests.get(
+                "https://api.frankfurter.app/latest",
+                params={"amount": amount, "from": base, "to": target},
+                timeout=10
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as e:
+            return {"error": f"Currency conversion failed: {e}"}
